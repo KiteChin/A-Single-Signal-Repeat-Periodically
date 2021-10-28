@@ -4,10 +4,15 @@
 //临时数据和存储
 VALUE_ADC Value_ADC;
 u16 Value_temp[1000] = {0};
-u16 Value_size = 200;
-u8 Wave_Flag = 0;
+u16 Wave_Size = 0;
 u16 Wave_Star = 0;
 u16 Wave_End = 0;
+u8 Wave_Flag = 0;
+u8 Wave_Break_Flag = 0;
+u16 Wave_Num = 0;
+
+u16 Wave_Stable = 0;
+
 static void Tim1_DMA_NVIC(void)
 {
 	NVIC_InitTypeDef NVIC_InitStructure;
@@ -45,7 +50,7 @@ void Tim1_DMA_Config(uint32_t *value, uint32_t buffersize)
 	
 	Tim1_DMA_NVIC();
 	
-	DMA_ITConfig(DMA2_Stream5,DMA_IT_TC,ENABLE);
+	DMA_ITConfig(DMA2_Stream5,DMA_IT_TC|DMA_IT_HT,ENABLE);
 	
 	
 	
@@ -67,44 +72,143 @@ void Tim1_DMA_Config(uint32_t *value, uint32_t buffersize)
 	
 }
 
+__INLINE static u16 Get_Fre(uint16_t Value_Offset)
+{
+	uint16_t Stab_Val = 0;
+	uint8_t Stab_Num = 0;
+
+	for(u8 i = 0; i < 20; i++)
+	{
+		int16_t temp = Value_temp[i*25 + Value_Offset] - Value_temp[(20-i)*25 + Value_Offset - 1];
+		if(temp > -0x100 && temp < 0x100)
+		{
+			Stab_Val = Value_temp[(20-i)*25 + Value_Offset];
+			Stab_Num++;
+		}else 
+		{
+		}
+	}
+
+	if(Stab_Num != 20)
+	{
+		return Stab_Val;
+	}else return 0;
+}	
+
+
+	
+
 void DMA2_Stream5_IRQHandler(void)
 {
-	DMA_Cmd(DMA2_Stream5,DISABLE);
-	if(DMA_GetITStatus(DMA2_Stream5,DMA_IT_TCIF5))
+	uint16_t Wave_Num = 0;
+	uint16_t Value_Offset = 0;
+
+	if(DMA_GetITStatus(DMA2_Stream5,DMA_IT_HTIF5))
 	{
-		uint16_t i = 0;
-		uint16_t num = 0;
-		uint8_t flag = 0;
-		uint8_t useful_num = 0;
-		for(i = 0; i < 1000-1; i++)
+		Value_Offset = 0;
+		uint16_t Value_Stable = Get_Fre(Value_Offset);
+		static uint8_t HT_Star_Flag = 0;
+		if(HT_Star_Flag == 1 && Wave_Star != 0)
 		{
-			if(Value_temp[i] > 0x600 && Value_temp[i]< 0x700)
-//			if(Value_temp[i] - Value_temp[i+1] < 0x10)
+			Wave_Star = 0;
+			HT_Star_Flag = 0;
+		}
+		if(Value_Stable != 0)
+		{
+			uint16_t Start_Num = 0;
+			uint16_t End_Num = 0;
+			for(u16 i = 0; i < 500; i++)
 			{
-				num++;
-				useful_num = 0;
-			}
-			else
-			{
-				useful_num++;
-				if(useful_num == 5 && flag == 0)
+				if(Value_temp[i] > Value_Stable - 30 && Value_temp[i] < Value_Stable + 30)
 				{
-					Wave_Star = i - useful_num + 1;
-					flag = 1;
+					if(Wave_Star != 0)
+					{
+						End_Num++;
+						if(End_Num == 5)
+						{
+							Wave_End = i - Start_Num + 1;
+							Wave_Stable = Value_Stable;
+						}				
+					}
+					
 				}
-//				if(flag ==0)
-//				{
-//					Wave_Star = i;
-//					flag = 1;
-//				}
-				
+				else
+				{
+					Wave_Num++;
+					if(Wave_Star == 0)
+					{
+						Start_Num++;
+						if(Start_Num == 5)
+						{
+							Wave_Star = i - Start_Num + 1;
+							HT_Star_Flag = 1;
+						}
+					}			
+				}
+			}
+		}
+		
+	}
+	else if (DMA_GetITStatus(DMA2_Stream5,DMA_IT_TCIF5))
+	{
+		Value_Offset = 500;
+		uint16_t Value_Stable = Get_Fre(Value_Offset);
+		static uint8_t TC_Star_Flag = 0;
+		if(TC_Star_Flag == 1 && Wave_Star != 0) 
+		{
+			Wave_Star = 0;
+			TC_Star_Flag = 0;
+		}
+		if(Value_Stable != 0)
+		{
+			uint16_t Start_Num = 0;
+			uint16_t End_Num = 0;
+			for(u16 i = 500; i < 1000; i++)
+			{
+				if(Value_temp[i] > Value_Stable - 30 && Value_temp[i] < Value_Stable + 30)
+				{
+					if(Wave_Star != 0)
+					{
+						End_Num++;
+						if(End_Num == 5)
+						{
+							Wave_End = i - Start_Num + 1;
+							Wave_Stable = Value_Stable;
+						}				
+					}
+					
+				}
+				else
+				{
+					Wave_Num++;
+					if(Wave_Star == 0)
+					{
+						Start_Num++;
+						if(Start_Num == 5)
+						{
+							Wave_Star = i - Start_Num + 1;
+							TC_Star_Flag = 1;
+						}
+					}			
+				}
 			}
 
-		}
-		if(num < 1000*19/20) 
-			Wave_Flag = 1;
+		}		
 	}
-	DMA_ClearFlag(DMA2_Stream5,DMA_IT_TCIF5);
-	if(Wave_Flag != 1)
-		DMA_Cmd(DMA2_Stream5,ENABLE);
+	if(Wave_Star && Wave_End)
+	{
+		if(Wave_Star < Wave_End) 
+		{
+			Wave_Size = Wave_End - Wave_Star;
+		}else
+		{
+			Wave_Size = Wave_End + 1000 - Wave_Star;
+			Wave_Break_Flag = 1;
+		}
+		Wave_Flag = 1;
+		
+		
+	}	
+	
+	DMA_ClearFlag(DMA2_Stream5,DMA_IT_TCIF5|DMA_IT_HTIF5);
 }

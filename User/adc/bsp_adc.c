@@ -46,7 +46,7 @@ static void Rheostat_ADC_Mode_Config(void)
   // 禁止DMA直接访问模式	
   ADC_CommonInitStructure.ADC_DMAAccessMode = ADC_DMAAccessMode_Disabled;
   // 采样时间间隔	
-  ADC_CommonInitStructure.ADC_TwoSamplingDelay = ADC_TwoSamplingDelay_20Cycles;  
+  ADC_CommonInitStructure.ADC_TwoSamplingDelay = ADC_TwoSamplingDelay_5Cycles;  
   ADC_CommonInit(&ADC_CommonInitStructure);
 	
   // -------------------ADC Init 结构体 参数 初始化--------------------------

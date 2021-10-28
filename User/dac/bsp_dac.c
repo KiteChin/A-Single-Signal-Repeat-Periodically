@@ -3,6 +3,10 @@
 
 static void Tim2_DMA(uint32_t *value, uint32_t buffersize)
 {
+	DMA_Cmd(DMA1_Stream1,DISABLE);		
+	TIM_Cmd(TIM2, DISABLE);
+	TIM_DMACmd(TIM2,TIM_DMA_Update,DISABLE);
+	
 	DMA_InitTypeDef DMA_InitStructure;
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA1 , ENABLE);	
   DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)(DAC_BASE+0x08);
@@ -37,6 +41,8 @@ static void Tim2_DMA(uint32_t *value, uint32_t buffersize)
 
 void DAC_DMA_Config(uint32_t *value, uint32_t buffersize)
 {
+	
+	
 	GPIO_InitTypeDef GPIO_InitStructure;
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA,ENABLE);
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC,ENABLE);
@@ -48,14 +54,12 @@ void DAC_DMA_Config(uint32_t *value, uint32_t buffersize)
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 	
 	DAC_InitTypeDef  DAC_InitStructure;
-  DAC_InitStructure.DAC_Trigger = DAC_Trigger_None;						//使用TIM2作为触发源
+  DAC_InitStructure.DAC_Trigger = DAC_Trigger_None;						
   DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;	//不使用波形发生器
   DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Enable;	//不使用DAC输出缓冲
-	//三角波振幅（本实验没有用到，可配置成任意值，但本结构体成员不能为空）
 	DAC_InitStructure.DAC_LFSRUnmask_TriangleAmplitude = DAC_TriangleAmplitude_4095;
   DAC_Init(DAC_Channel_1, &DAC_InitStructure);
 	DAC_Cmd(DAC_Channel_1, ENABLE);
-//  DAC_DMACmd(DAC_Channel_1, ENABLE);
 	
 	Tim2_DMA(value, buffersize);
 }

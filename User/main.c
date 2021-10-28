@@ -23,22 +23,39 @@
 
 int main(void)
 {	
-	Value_size = 200;
   Debug_USART_Config();
 	Rheostat_Init();	
 	Tim1_DMA_Config((uint32_t *)Value_temp, 1000);
-	DAC_DMA_Config((uint32_t *)&Value_ADC.Value_1, 200);
+//	DAC_DMA_Config((uint32_t *)&Value_ADC.Value_1, 200);
 	while (1)
 	{  
 		if(Wave_Flag == 1)
 		{
-			uint16_t i = 0;
-			for(i = 0; i < Value_size; i++)
+			if(Wave_Break_Flag == 0)
 			{
-				Value_ADC.Value_1[i] = Value_temp[i+Wave_Star];
+				for(u16 i = 0; i < Wave_Size; i++)
+				{
+					Value_ADC.Value_1[i] = Value_temp[i+Wave_Star];
+				}
+			}else
+			{
+				for(u16 i = 0; i < Wave_Size; i++)
+				{
+					if(i+Wave_End < 999)				
+						Value_ADC.Value_1[i] = Value_temp[i+Wave_End];
+					else
+						Value_ADC.Value_1[i] = Value_temp[i+Wave_Star];
+				}
+				
 			}
-			DMA_Cmd(DMA2_Stream5,ENABLE);
+//			DMA_Cmd(DMA2_Stream5,DISABLE);
+			
+			DAC_DMA_Config((uint32_t *)&Value_ADC.Value_1, Wave_Size);
+			Wave_Star = 0;
+			Wave_End = 0;
+			Wave_Size = 0;
 			Wave_Flag = 0;
+//			DMA_Cmd(DMA2_Stream5,ENABLE);
 		}
 	}
 }
